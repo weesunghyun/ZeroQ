@@ -21,6 +21,7 @@
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 import torch
+import os
 try:
     from medmnist import INFO
     import medmnist
@@ -144,6 +145,8 @@ def getTestData(dataset='imagenet',
             transforms.Normalize(mean=[0.5] * info['n_channels'],
                                  std=[0.5] * info['n_channels'])
         ])
+        # Create directory if it doesn't exist
+        os.makedirs(path, exist_ok=True)
         test_dataset = data_class(split='test', root=path,
                                  download=True, transform=transform)
         test_loader = DataLoader(test_dataset,
