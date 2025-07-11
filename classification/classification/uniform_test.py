@@ -22,9 +22,14 @@ import argparse
 import torch
 import numpy as np
 import torch.nn as nn
+import logging
+import os
+from datetime import datetime
 from pytorchcv.model_provider import get_model as ptcv_get_model
 from utils import *
 from distill_data import *
+
+MEDMNIST_CLASSES = CLASSIFICATION_DATASETS
 
 
 # model settings
@@ -36,7 +41,7 @@ def arg_parse():
     parser.add_argument('--dataset',
                         type=str,
                         default='imagenet',
-                        choices=['imagenet', 'cifar10'],
+                        choices=['imagenet', 'cifar10'] + list(MEDMNIST_CLASSES.keys()),
                         help='type of dataset')
     parser.add_argument('--model',
                         type=str,
@@ -55,6 +60,18 @@ def arg_parse():
                         type=int,
                         default=128,
                         help='batch size of test data')
+    parser.add_argument('--pretrained',
+                        type=str,
+                        default=None,
+                        help='path to pretrained weights')
+    parser.add_argument('--weight_bit',
+                        type=int,
+                        default=8,
+                        help='bitwidth for weights')
+    parser.add_argument('--act_bit',
+                        type=int,
+                        default=8,
+                        help='bitwidth for activations')
     parser.add_argument('--save',
                         type=str,
                         default=None,
@@ -67,8 +84,33 @@ def arg_parse():
     return args
 
 
+def create_logger(args):
+    log_dir = os.path.join(
+        'log',
+        f"{args.dataset}_{args.model}_{args.weight_bit}w_{args.act_bit}a",
+    )
+    os.makedirs(log_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = os.path.join(log_dir, f'{timestamp}.log')
+
+    logger = logging.getLogger('zeroq')
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    return logger
+
+
 if __name__ == '__main__':
     args = arg_parse()
+    logger = create_logger(args)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
 
@@ -77,10 +119,21 @@ if __name__ == '__main__':
         model = ptcv_get_model(args.model, pretrained=False)
         model.load_state_dict(torch.load(args.load))
         quantized_model = model.eval()
-        print('****** Quantized model loaded ******')
+        logger.info('****** Quantized model loaded ******')
     else:
-        model = ptcv_get_model(args.model, pretrained=True)
-        print('****** Full precision model loaded ******')
+        if args.dataset in MEDMNIST_CLASSES:
+            num_classes = MEDMNIST_CLASSES.get(args.dataset, 2)
+            model = ptcv_get_model(
+                args.model, pretrained=False, num_classes=num_classes)
+            if args.pretrained is not None:
+                model.load_state_dict(torch.load(args.pretrained))
+        else:
+            if args.pretrained is not None:
+                model = ptcv_get_model(args.model, pretrained=False)
+                model.load_state_dict(torch.load(args.pretrained))
+            else:
+                model = ptcv_get_model(args.model, pretrained=True)
+        logger.info('****** Full precision model loaded ******')
 
         # Generate distilled data
         dataloader = getDistilData(
@@ -88,22 +141,25 @@ if __name__ == '__main__':
             args.dataset,
             batch_size=args.batch_size,
             for_inception=args.model.startswith('inception'))
-        print('****** Data loaded ******')
+        logger.info('****** Data loaded ******')
 
-        # Quantize single-precision model to 8-bit model
-        quantized_model = quantize_model(model)
+        # Quantize single-precision model
+        quantized_model = quantize_model(
+            model,
+            weight_bit=args.weight_bit,
+            act_bit=args.act_bit)
         # Freeze BatchNorm statistics
         quantized_model.eval()
         quantized_model = quantized_model.cuda()
 
         # Update activation range according to distilled data
         update(quantized_model, dataloader)
-        print('****** Zero Shot Quantization Finished ******')
+        logger.info('****** Zero Shot Quantization Finished ******')
 
     # Load validation data
     test_loader = getTestData(args.dataset,
                               batch_size=args.test_batch_size,
-                              path='./data/imagenet/',
+                              path='./data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/',
                               for_inception=args.model.startswith('inception'))
 
     # Freeze activation range during test
@@ -111,7 +167,7 @@ if __name__ == '__main__':
     quantized_model = nn.DataParallel(quantized_model).cuda()
 
     # Test the final quantized model
-    test(quantized_model, test_loader)
+    test(quantized_model, test_loader, logger)
 
     # Save the final model
     if args.save is not None:

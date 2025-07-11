@@ -63,8 +63,8 @@ def getDistilData(teacher_model,
 	dataset: the name of the dataset
 	batch_size: the batch size of generated distilled data
 	num_batch: the number of batch of generated distilled data
-	for_inception: whether the data is for Inception because inception has input size 299 rather than 224
-	"""
+        for_inception: whether the data is for Inception because inception has input size 299 rather than 224
+        """
 
     # initialize distilled data with random noise according to the dataset
     dataloader = getRandomData(dataset=dataset,

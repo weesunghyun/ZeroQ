@@ -14,6 +14,7 @@ pip install -r requirements.txt --user
 # Set a symbolic link to ImageNet validation data (used only to evaluate model) 
 mkdir data
 ln -s /path/to/imagenet/ data/
+# MedMNIST dataset will be downloaded automatically when selected
 ```
 
 The folder structures should be the same as following
@@ -51,11 +52,17 @@ export CUDA_VISIBLE_DEVICES=0
 python uniform_test.py [--dataset] [--model] [--batch_size] [--test_batch_size]
 
 optional arguments:
---dataset                   type of dataset (default: imagenet)
+--dataset                   type of dataset (imagenet/cifar10/pathmnist/dermamnist/octmnist/pneumoniamnist/retinamnist/breastmnist/bloodmnist/tissuemnist/organamnist/organcmnist/organsmnist, default: imagenet)
 --model                     model to be quantized (default: resnet18)
 --batch-size                batch size of distilled data (default: 64)
 --test-batch-size           batch size of test data (default: 512)
+--pretrained               path to pretrained weights
+--weight_bit               bitwidth for weights (default: 8)
+--act_bit                  bitwidth for activations (default: 8)
 ```
+
+Logs are saved under `log/<dataset>_<model>_<weight_bit>w_<act_bit>a/` with a
+timestamped filename.
 
 
 

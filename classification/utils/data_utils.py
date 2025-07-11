@@ -21,6 +21,26 @@
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 import torch
+try:
+    from medmnist import INFO
+    import medmnist
+except ImportError:  # medmnist is optional
+    INFO = None
+
+# Number of classes for each MedMNIST subset
+CLASSIFICATION_DATASETS = {
+    'pathmnist': 9,
+    'dermamnist': 7,
+    'octmnist': 4,
+    'pneumoniamnist': 2,
+    'retinamnist': 5,
+    'breastmnist': 2,
+    'bloodmnist': 8,
+    'tissuemnist': 8,
+    'organamnist': 11,
+    'organcmnist': 11,
+    'organsmnist': 11,
+}
 
 
 class UniformDataset(Dataset):
@@ -44,10 +64,11 @@ class UniformDataset(Dataset):
 
 def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
     """
-    get random sample dataloader 
-    dataset: name of the dataset 
+    get random sample dataloader
+    dataset: name of the dataset
     batch_size: the batch size of random data
     for_inception: whether the data is for Inception because inception has input size 299 rather than 224
+    dataset: name of MedMNIST subset if using MedMNIST
     """
     if dataset == 'cifar10':
         size = (3, 32, 32)
@@ -58,6 +79,10 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
             size = (3, 224, 224)
         else:
             size = (3, 299, 299)
+    elif dataset in CLASSIFICATION_DATASETS and INFO is not None:
+        info = INFO[dataset]
+        size = (info['n_channels'], info['img_size'], info['img_size'])
+        num_data = 10000
     else:
         raise NotImplementedError
     dataset = UniformDataset(length=10000, size=size, transform=None)
@@ -73,11 +98,12 @@ def getTestData(dataset='imagenet',
                 path='data/imagenet',
                 for_inception=False):
     """
-    Get dataloader of testset 
-    dataset: name of the dataset 
+    Get dataloader of testset
+    dataset: name of the dataset
     batch_size: the batch size of random data
     path: the path to the data
     for_inception: whether the data is for Inception because inception has input size 299 rather than 224
+    dataset: name of MedMNIST subset if using MedMNIST
     """
     if dataset == 'imagenet':
         input_size = 299 if for_inception else 224
@@ -110,3 +136,20 @@ def getTestData(dataset='imagenet',
                                  shuffle=False,
                                  num_workers=32)
         return test_loader
+    elif dataset in CLASSIFICATION_DATASETS and INFO is not None:
+        info = INFO[dataset]
+        data_class = getattr(medmnist, info['python_class'])
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5] * info['n_channels'],
+                                 std=[0.5] * info['n_channels'])
+        ])
+        test_dataset = data_class(split='test', root=path,
+                                 download=True, transform=transform)
+        test_loader = DataLoader(test_dataset,
+                                 batch_size=batch_size,
+                                 shuffle=False,
+                                 num_workers=32)
+        return test_loader
+    else:
+        raise NotImplementedError
