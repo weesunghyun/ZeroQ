@@ -80,6 +80,10 @@ def arg_parse():
                         type=str,
                         default=None,
                         help='load a quantized model')
+    parser.add_argument('--data_path',
+                        type=str,
+                        default=None,
+                        help='path to dataset')
     args = parser.parse_args()
     return args
 
@@ -157,9 +161,11 @@ if __name__ == '__main__':
         logger.info('****** Zero Shot Quantization Finished ******')
 
     # Load validation data
+    default_path = './data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/'
+    data_path = args.data_path if args.data_path is not None else default_path
     test_loader = getTestData(args.dataset,
                               batch_size=args.test_batch_size,
-                              path='./data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/',
+                              path=data_path,
                               for_inception=args.model.startswith('inception'))
 
     # Freeze activation range during test
