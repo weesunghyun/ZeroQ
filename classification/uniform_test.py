@@ -70,6 +70,10 @@ def arg_parse():
                         type=int,
                         default=8,
                         help='bitwidth for activations')
+    parser.add_argument('--data_path',
+                        type=str,
+                        default=None,
+                        help='path to dataset')
     args = parser.parse_args()
     return args
 
@@ -120,9 +124,11 @@ if __name__ == '__main__':
     logger.info('****** Full precision model loaded ******')
 
     # Load validation data
+    default_path = './data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/'
+    data_path = args.data_path if args.data_path is not None else default_path
     test_loader = getTestData(args.dataset,
                               batch_size=args.test_batch_size,
-                              path='./data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/',
+                              path=data_path,
                               for_inception=args.model.startswith('inception'))
     # Generate distilled data
     dataloader = getDistilData(
