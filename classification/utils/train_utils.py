@@ -24,7 +24,7 @@ import torch.nn as nn
 from progress.bar import Bar
 
 
-def test(model, test_loader):
+def test(model, test_loader, logger=None):
     """
     test a model on a given dataset
     """
@@ -42,7 +42,11 @@ def test(model, test_loader):
 
             bar.suffix = f'({batch_idx + 1}/{len(test_loader)}) | ETA: {bar.eta_td} | top1: {acc}'
             bar.next()
-    print('\nFinal acc: %.2f%% (%d/%d)' % (100. * acc, correct, total))
+    msg = '\nFinal acc: %.2f%% (%d/%d)' % (100. * acc, correct, total)
+    if logger is not None:
+        logger.info(msg)
+    else:
+        print(msg)
     bar.finish()
     model.train()
     return acc

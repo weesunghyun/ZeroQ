@@ -1,3 +1,4 @@
 pytorchcv==0.0.51
 progressbar>=1.5
 progress
+medmnist>=2.0.1
