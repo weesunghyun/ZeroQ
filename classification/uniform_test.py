@@ -25,12 +25,84 @@ import torch.nn as nn
 import logging
 import os
 import random
+from collections import OrderedDict
 from datetime import datetime
 from pytorchcv.model_provider import get_model as ptcv_get_model
 from utils import *
 from distill_data import *
 
 MEDMNIST_CLASSES = CLASSIFICATION_DATASETS
+
+
+def convert_state_dict(pretrained_state_dict, new_model):
+    """
+    Converts a pretrained ResNet-18 state_dict to match the key format of the new model,
+    including all 'num_batches_tracked' keys for BatchNorm layers.
+
+    Args:
+        pretrained_state_dict (OrderedDict): The state_dict object from the pretrained model.
+        new_model (torch.nn.Module): An instance of the new model architecture.
+
+    Returns:
+        OrderedDict: The converted state_dict.
+    """
+    # For debugging: Check if the problematic key exists in the source state_dict
+    if 'bn1.num_batches_tracked' not in pretrained_state_dict:
+        print("Warning: 'bn1.num_batches_tracked' not found in the source checkpoint!")
+
+    new_state_dict = OrderedDict()
+    key_map = {}
+
+    # 1. Initial block (conv1 and bn1)
+    key_map.update({
+        'conv1.weight': 'features.init_block.conv.conv.weight',
+        'bn1.weight': 'features.init_block.conv.bn.weight',
+        'bn1.bias': 'features.init_block.conv.bn.bias',
+        'bn1.running_mean': 'features.init_block.conv.bn.running_mean',
+        'bn1.running_var': 'features.init_block.conv.bn.running_var',
+        'bn1.num_batches_tracked': 'features.init_block.conv.bn.num_batches_tracked'  # The missing key
+    })
+
+    # 2. ResNet stages (layer1 to layer4)
+    for i in range(1, 5):  # Stages 1-4
+        for j in range(2):  # Units 1-2 (for ResNet-18)
+            # Body convolutions and their batchnorms
+            for conv_idx in [1, 2]:
+                old_prefix = f'layer{i}.{j}.conv{conv_idx}'
+                new_prefix = f'features.stage{i}.unit{j+1}.body.conv{conv_idx}'
+                key_map[f'{old_prefix}.weight'] = f'{new_prefix}.conv.weight'
+
+                old_bn_prefix = f'layer{i}.{j}.bn{conv_idx}'
+                new_bn_prefix = f'features.stage{i}.unit{j+1}.body.conv{conv_idx}'
+                key_map[f'{old_bn_prefix}.weight'] = f'{new_bn_prefix}.bn.weight'
+                key_map[f'{old_bn_prefix}.bias'] = f'{new_bn_prefix}.bn.bias'
+                key_map[f'{old_bn_prefix}.running_mean'] = f'{new_bn_prefix}.bn.running_mean'
+                key_map[f'{old_bn_prefix}.running_var'] = f'{new_bn_prefix}.bn.running_var'
+                key_map[f'{old_bn_prefix}.num_batches_tracked'] = f'{new_bn_prefix}.bn.num_batches_tracked'
+
+            # Downsample (identity) convolution for stages 2, 3, 4
+            if i > 1 and j == 0:
+                old_ds_prefix = f'layer{i}.{j}.downsample'
+                new_ds_prefix = f'features.stage{i}.unit{j+1}.identity_conv'
+                key_map[f'{old_ds_prefix}.0.weight'] = f'{new_ds_prefix}.conv.weight'
+                key_map[f'{old_ds_prefix}.1.weight'] = f'{new_ds_prefix}.bn.weight'
+                key_map[f'{old_ds_prefix}.1.bias'] = f'{new_ds_prefix}.bn.bias'
+                key_map[f'{old_ds_prefix}.1.running_mean'] = f'{new_ds_prefix}.bn.running_mean'
+                key_map[f'{old_ds_prefix}.1.running_var'] = f'{new_ds_prefix}.bn.running_var'
+                key_map[f'{old_ds_prefix}.1.num_batches_tracked'] = f'{new_ds_prefix}.bn.num_batches_tracked'
+
+    # 3. Final fully-connected layer
+    key_map.update({
+        'fc.weight': 'output.weight',
+        'fc.bias': 'output.bias'
+    })
+
+    # Populate the new_state_dict using the generated map
+    for old_key, new_key in key_map.items():
+        if old_key in pretrained_state_dict:
+            new_state_dict[new_key] = pretrained_state_dict[old_key]
+
+    return new_state_dict
 
 
 # model settings
@@ -86,7 +158,7 @@ def arg_parse():
 def create_logger(args):
     log_dir = os.path.join(
         'log',
-        f"{args.dataset}_{args.model}_{args.weight_bit}w_{args.act_bit}a",
+        f"{args.dataset}_{args.model}_w{args.weight_bit}a{args.act_bit}",
     )
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -124,7 +196,13 @@ if __name__ == '__main__':
         model = ptcv_get_model(
             args.model, pretrained=False, num_classes=num_classes)
         if args.pretrained is not None:
-            model.load_state_dict(torch.load(args.pretrained))
+            checkpoint = torch.load(args.pretrained)
+            if isinstance(checkpoint, dict) and 'net' in checkpoint:
+                converted_state_dict = convert_state_dict(checkpoint['net'], model)
+            else:
+                converted_state_dict = convert_state_dict(checkpoint, model)
+            model.load_state_dict(converted_state_dict)
+            logger.info('****** Converted and loaded pretrained weights ******')
     else:
         if args.pretrained is not None:
             model = ptcv_get_model(args.model, pretrained=False)

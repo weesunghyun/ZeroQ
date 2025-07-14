@@ -21,6 +21,7 @@
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 import torch
+import os
 try:
     from medmnist import INFO
     import medmnist
@@ -81,8 +82,9 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
             size = (3, 299, 299)
     elif dataset in CLASSIFICATION_DATASETS and INFO is not None:
         info = INFO[dataset]
-        size = (info['n_channels'], info['img_size'], info['img_size'])
-        num_data = 10000
+        # MedMNIST datasets are standardized to 28x28 images
+        img_size = 224  # All MedMNIST datasets use 28x28 images
+        size = (info['n_channels'], img_size, img_size)
     else:
         raise NotImplementedError
     dataset = UniformDataset(length=10000, size=size, transform=None)
@@ -144,8 +146,11 @@ def getTestData(dataset='imagenet',
             transforms.Normalize(mean=[0.5] * info['n_channels'],
                                  std=[0.5] * info['n_channels'])
         ])
+        # Create directory if it doesn't exist
+        os.makedirs(path, exist_ok=True)
+        # Use size=28 for MedMNIST datasets (standard size)
         test_dataset = data_class(split='test', root=path,
-                                 download=True, transform=transform)
+                                 download=True, transform=transform, size=224)
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
