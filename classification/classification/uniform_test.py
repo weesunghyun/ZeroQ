@@ -24,6 +24,7 @@ import numpy as np
 import torch.nn as nn
 import logging
 import os
+import random
 from datetime import datetime
 from pytorchcv.model_provider import get_model as ptcv_get_model
 from utils import *
@@ -80,6 +81,10 @@ def arg_parse():
                         type=str,
                         default=None,
                         help='load a quantized model')
+    parser.add_argument('--seed',
+                        type=int,
+                        default=None,
+                        help='random seed for reproducibility')
     parser.add_argument('--data_path',
                         type=str,
                         default=None,
@@ -114,6 +119,11 @@ def create_logger(args):
 
 if __name__ == '__main__':
     args = arg_parse()
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
     logger = create_logger(args)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True

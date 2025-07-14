@@ -7,8 +7,8 @@ do
         echo "Testing $DATASET with W${BIT}A${BIT} ..."
         python uniform_test.py \
             --dataset=$DATASET \
-			--model=$MODEL \
-			--pretrained=./checkpoints/${MODEL}_${DATASET}.pth \
+    		  	--model=$MODEL \
+		    	  --pretrained=./checkpoints/${MODEL}_${DATASET}.pth \
             --weight_bit=$BIT \
             --act_bit=$BIT \
             --batch_size=64 \
