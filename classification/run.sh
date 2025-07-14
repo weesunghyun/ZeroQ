@@ -1,14 +1,23 @@
 MODEL=resnet18
+DATASETS=(
+	dermamnist
+	tissuemnist
+)
+BITS=(
+	2
+	3
+	4
+)
 
-for DATASET in dermamnist tissuemnist
+for DATASET in ${DATASETS[@]}
 do
-    for BIT in 2 3 4
+    for BIT in ${BITS[@]}
     do
         echo "Testing $DATASET with W${BIT}A${BIT} ..."
         python uniform_test.py \
             --dataset=$DATASET \
-    		  	--model=$MODEL \
-		    	  --pretrained=./checkpoints/${MODEL}_${DATASET}.pth \
+			--model=$MODEL \
+			--pretrained=./checkpoints/${MODEL}_${DATASET}.pth \
             --weight_bit=$BIT \
             --act_bit=$BIT \
             --batch_size=64 \
