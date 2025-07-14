@@ -63,13 +63,14 @@ class UniformDataset(Dataset):
         return sample
 
 
-def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
+def getRandomData(dataset='cifar10', batch_size=512, for_inception=False, init_data_path=None):
     """
     get random sample dataloader
     dataset: name of the dataset
     batch_size: the batch size of random data
     for_inception: whether the data is for Inception because inception has input size 299 rather than 224
     dataset: name of MedMNIST subset if using MedMNIST
+    init_data_path: the path to the initialization dataset
     """
     if dataset == 'cifar10':
         size = (3, 32, 32)
@@ -84,14 +85,34 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
         info = INFO[dataset]
         # MedMNIST datasets are standardized to 28x28 images
         img_size = 224  # All MedMNIST datasets use 28x28 images
-        size = (info['n_channels'], img_size, img_size)
+        # size = (info['n_channels'], img_size, img_size)
+        size = (3, img_size, img_size)
     else:
         raise NotImplementedError
-    dataset = UniformDataset(length=10000, size=size, transform=None)
-    data_loader = DataLoader(dataset,
+
+    # Prepare dataset for initialization if provided
+    dataset_obj = None
+    if init_data_path is not None:
+        init_resize_size = 256 if dataset == 'imagenet' or dataset in CLASSIFICATION_DATASETS else 32
+        init_crop_size = 224 if dataset == 'imagenet' or dataset in CLASSIFICATION_DATASETS else 32
+
+        init_transform = transforms.Compose([
+            transforms.Resize(init_resize_size),
+            transforms.CenterCrop(init_crop_size),
+            transforms.ToTensor(),
+            # transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                      std=[0.229, 0.224, 0.225])
+        ])
+        dataset_obj = datasets.ImageFolder(init_data_path, transform=init_transform)
+        length = len(dataset_obj)
+        print(f"Init dataset loaded from {init_data_path}, {length} images")    
+    else:
+        dataset_obj = UniformDataset(length=10000, size=size, transform=None)
+
+    data_loader = DataLoader(dataset_obj,
                              batch_size=batch_size,
                              shuffle=False,
-                             num_workers=32)
+                             num_workers=16)
     return data_loader
 
 
@@ -122,7 +143,7 @@ def getTestData(dataset='imagenet',
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
-                                 num_workers=32)
+                                 num_workers=16)
         return test_loader
     elif dataset == 'cifar10':
         data_dir = '/rscratch/yaohuic/data/'
@@ -136,13 +157,14 @@ def getTestData(dataset='imagenet',
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
-                                 num_workers=32)
+                                 num_workers=16)
         return test_loader
     elif dataset in CLASSIFICATION_DATASETS and INFO is not None:
         info = INFO[dataset]
         data_class = getattr(medmnist, info['python_class'])
         transform = transforms.Compose([
             transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.size(0) == 1 else x),  # Convert grayscale to RGB
             transforms.Normalize(mean=[0.5] * info['n_channels'],
                                  std=[0.5] * info['n_channels'])
         ])
@@ -154,7 +176,7 @@ def getTestData(dataset='imagenet',
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
-                                 num_workers=32)
+                                 num_workers=16)
         return test_loader
     else:
         raise NotImplementedError

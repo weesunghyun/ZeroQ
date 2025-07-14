@@ -151,6 +151,10 @@ def arg_parse():
                         type=str,
                         default=None,
                         help='path to dataset')
+    parser.add_argument('--init_data_path',
+                        type=str,
+                        default=None,
+                        help='path to initialization dataset')
     args = parser.parse_args()
     return args
 
@@ -158,7 +162,7 @@ def arg_parse():
 def create_logger(args):
     log_dir = os.path.join(
         'log',
-        f"{args.dataset}_{args.model}_w{args.weight_bit}a{args.act_bit}",
+        f"{args.dataset}_{args.model}_w{args.weight_bit}a{args.act_bit}{'_' + os.path.basename(args.init_data_path) if args.init_data_path is not None else ''}",
     )
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -223,7 +227,9 @@ if __name__ == '__main__':
         model.cuda(),
         args.dataset,
         batch_size=args.batch_size,
-        for_inception=args.model.startswith('inception'))
+        for_inception=args.model.startswith('inception'),
+        init_data_path=args.init_data_path
+        )
     logger.info('****** Data loaded ******')
 
     # Quantize single-precision model

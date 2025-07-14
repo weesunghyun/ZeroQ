@@ -54,7 +54,8 @@ def getDistilData(teacher_model,
                   dataset,
                   batch_size,
                   num_batch=1,
-                  for_inception=False):
+                  for_inception=False,
+                  init_data_path=None):
     """
 	Generate distilled data according to the BatchNorm statistics in the pretrained single-precision model.
 	Currently only support a single GPU.
@@ -64,12 +65,14 @@ def getDistilData(teacher_model,
 	batch_size: the batch size of generated distilled data
 	num_batch: the number of batch of generated distilled data
         for_inception: whether the data is for Inception because inception has input size 299 rather than 224
-        """
+        init_data_path: the path to the initialization dataset
+    """
 
     # initialize distilled data with random noise according to the dataset
     dataloader = getRandomData(dataset=dataset,
                                batch_size=batch_size,
-                               for_inception=for_inception)
+                               for_inception=for_inception,
+                               init_data_path=init_data_path)
 
     eps = 1e-6
     # initialize hooks and single-precision model
@@ -101,6 +104,10 @@ def getDistilData(teacher_model,
         if i == num_batch:
             break
         # initialize the criterion, optimizer, and scheduler
+        # Handle case where dataloader returns (images, labels) tuple
+        if isinstance(gaussian_data, (list, tuple)):
+            gaussian_data = gaussian_data[0]  # Extract images from tuple
+        
         gaussian_data = gaussian_data.cuda()
         gaussian_data.requires_grad = True
         crit = nn.CrossEntropyLoss().cuda()
