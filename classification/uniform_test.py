@@ -191,8 +191,9 @@ if __name__ == '__main__':
         random.seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
     logger = create_logger(args)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = True
+    # Enable deterministic behavior when a seed is provided
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Load pretrained model
     if args.dataset in MEDMNIST_CLASSES:

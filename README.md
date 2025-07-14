@@ -69,6 +69,9 @@ The script prints progress to the console and also writes the same information
 to a log file under `log/<dataset>_<model>_<weight_bit>w_<act_bit>a/` with a
 timestamped filename.
 
+If you pass the `--seed` option, the scripts enable deterministic cuDNN mode,
+which can reduce run-to-run variance.
+
 
 
 
