@@ -153,7 +153,7 @@ def arg_parse():
 def create_logger(args):
     log_dir = os.path.join(
         'log',
-        f"{args.dataset}_{args.model}_{args.weight_bit}w_{args.act_bit}a",
+        f"{args.dataset}_{args.model}_w{args.weight_bit}a{args.act_bit}",
     )
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

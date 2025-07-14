@@ -35,12 +35,25 @@ def test(model, test_loader, logger=None):
         for batch_idx, (inputs, targets) in enumerate(test_loader):
             inputs, targets = inputs.cuda(), targets.cuda()
             outputs = model(inputs)
+            
+            # Handle DataParallel outputs - they might be concatenated
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
+            
+            # Fix targets shape - ensure it's 1D
+            if targets.dim() > 1:
+                targets = targets.squeeze()
+            
+            # Ensure outputs and targets have the correct shape
+            if outputs.dim() > 2:
+                outputs = outputs.view(outputs.size(0), -1)
+            
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
             acc = correct / total
 
-            bar.suffix = f'({batch_idx + 1}/{len(test_loader)}) | ETA: {bar.eta_td} | top1: {acc}'
+            bar.suffix = f'({batch_idx + 1}/{len(test_loader)}) | ETA: {bar.eta_td} | top1: {acc:.4f}'
             bar.next()
     msg = '\nFinal acc: %.2f%% (%d/%d)' % (100. * acc, correct, total)
     if logger is not None:
