@@ -100,8 +100,8 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False, init_d
             transforms.Resize(init_resize_size),
             transforms.CenterCrop(init_crop_size),
             transforms.ToTensor(),
-            # transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                      std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
         ])
         dataset_obj = datasets.ImageFolder(init_data_path, transform=init_transform)
         length = len(dataset_obj)
