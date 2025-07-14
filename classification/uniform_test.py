@@ -24,6 +24,7 @@ import numpy as np
 import torch.nn as nn
 import logging
 import os
+import random
 from datetime import datetime
 from pytorchcv.model_provider import get_model as ptcv_get_model
 from utils import *
@@ -70,6 +71,14 @@ def arg_parse():
                         type=int,
                         default=8,
                         help='bitwidth for activations')
+    parser.add_argument('--seed',
+                        type=int,
+                        default=None,
+                        help='random seed for reproducibility')
+    parser.add_argument('--data_path',
+                        type=str,
+                        default=None,
+                        help='path to dataset')
     args = parser.parse_args()
     return args
 
@@ -100,6 +109,11 @@ def create_logger(args):
 
 if __name__ == '__main__':
     args = arg_parse()
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
     logger = create_logger(args)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
@@ -120,9 +134,11 @@ if __name__ == '__main__':
     logger.info('****** Full precision model loaded ******')
 
     # Load validation data
+    default_path = './data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/'
+    data_path = args.data_path if args.data_path is not None else default_path
     test_loader = getTestData(args.dataset,
                               batch_size=args.test_batch_size,
-                              path='./data/medmnist/' if args.dataset in MEDMNIST_CLASSES else './data/imagenet/',
+                              path=data_path,
                               for_inception=args.model.startswith('inception'))
     # Generate distilled data
     dataloader = getDistilData(
